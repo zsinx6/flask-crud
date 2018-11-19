@@ -68,14 +68,14 @@ class get_all_item_type(Resource):
     create a json with this query then send
     """
     def get(self):
-        query = ItemType.query.order_by(ItemType.name).all()
+        query = db.session.query(ItemType.name, ItemType.description, ItemType.brand_id, Brand.name.label("brand_name"),
+                                 ItemType.id).join(Brand, Brand.id == ItemType.brand_id).order_by(ItemType.name).all()
         json_send = {}
         for result in query:
-            brand_query = Brand.query.get(result.brand_id)
             json_send[result.id] = {"name": result.name,
                                     "description": result.description,
                                     "brand_id": result.brand_id,
-                                    "brand_name": brand_query.name}
+                                    "brand_name": result.brand_name}
         return jsonify(json_send)
 
 
