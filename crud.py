@@ -64,12 +64,20 @@ def resetdb():
 
 
 class get_all_item_type(Resource):
-    """SELECT i.name, i.description, i.brand_id, b.brand_name FROM item_type i JOIN brand b ON i.brand_id = b.id;
+    """SELECT i.name, i.description, i.brand_id, b.name
+    FROM item_type i JOIN brand b ON i.brand_id = b.id;
+
     create a json with this query then send
     """
     def get(self):
-        query = db.session.query(ItemType.name, ItemType.description, ItemType.brand_id, Brand.name.label("brand_name"),
-                                 ItemType.id).join(Brand, Brand.id == ItemType.brand_id).order_by(ItemType.name).all()
+        query = (db.session.query(ItemType.name,
+                                  ItemType.description,
+                                  ItemType.brand_id,
+                                  Brand.name.label("brand_name"),
+                                  ItemType.id)
+                 .join(Brand, Brand.id == ItemType.brand_id)
+                 .order_by(ItemType.name).all())
+
         json_send = {}
         for result in query:
             json_send[result.id] = {"name": result.name,
