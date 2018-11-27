@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify  # noqa
 from flask_restful import Resource, Api, reqparse, abort
 
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
 
 _formatter = '%(levelname)-8s : %(module)-10s : %(funcName)-25s :%(lineno)-3d : %(message)s'
 _logger = logging.getLogger(__name__)
@@ -92,12 +93,9 @@ class get_all_item_type_brand(Resource):
 
 class item_type_id(Resource):
     def get(self, _id):
-        query = (db.session.query(ItemType.name,
-                                  ItemType.description,
-                                  ItemType.brand_id,
-                                  ItemType.id)
-                 .filter(ItemType.id == _id).first())
-
+        query = ItemType.query.get(_id)
+        if not query:
+            abort(404, message="ItemType id {} doesn't exists".format(_id))
         json_send = {}
         json_send[query.id] = {"name": query.name,
                                "description": query.description,
@@ -105,20 +103,49 @@ class item_type_id(Resource):
         return jsonify(json_send)
 
     def delete(self, _id):
-        pass
-
-    def put(self, _id):
-        pass
+        query = ItemType.query.get(_id)
+        if not query:
+            abort(404, message="ItemType id {} doesn't exists".format(_id))
+        db.session.delete(query)
+        db.session.commit()
+        json_send = {}
+        json_send[query.id] = {"name": query.name,
+                               "description": query.description,
+                               "brand_id": query.brand_id}
+        return jsonify(json_send)
 
     def patch(self, _id):
-        pass
+        parser = reqparse.RequestParser()
+        parser.add_argument("name", type=str)
+        parser.add_argument("description", type=str)
+        parser.add_argument("brand_id", type=int, help="Must match an existing brand")
+        document = parser.parse_args()
+
+        query = ItemType.query.get(_id)
+
+        name = document.get("name")
+        description = document.get("description")
+        brand_id = document.get("brand_id")
+
+        if name:
+            query.name = name
+        if description:
+            query.description = description
+        if brand_id:
+            if not Brand.query.get(brand_id):
+                abort(404, message="brand_id {} doesn't exists".format(brand_id))
+            query.brand_id = brand_id
+        try:
+            db.session.commit()
+        except IntegrityError as ex:
+            abort(400, message=str(ex))
 
 
 class new_item_type(Resource):
     parser = reqparse.RequestParser()
     parser.add_argument("name", type=str)
     parser.add_argument("description", type=str)
-    parser.add_argument("brand_id", type=int)
+    parser.add_argument("brand_id", type=int, help="Must match an existing brand")
 
     def post(self):
         document = self.parser.parse_args(strict=True)
@@ -126,15 +153,16 @@ class new_item_type(Resource):
         description = document.get("description")
         brand_id = document.get("brand_id")
 
-        query_brand = (db.session.query(Brand.id,
-                                        Brand.name)
-                       .filter(Brand.id == brand_id).first())
+        query_brand = Brand.query.get(brand_id)
         if not query_brand:
             abort(404, message="brand_id {} doesn't exists".format(brand_id))
 
         item_type = ItemType(name=name, description=description, brand_id=brand_id)
         db.session.add(item_type)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError as ex:
+            abort(400, message=str(ex))
 
         json_send = {}
         json_send[item_type.id] = {"name": name, "description": description, "brand_id": brand_id}
