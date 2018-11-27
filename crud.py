@@ -120,13 +120,15 @@ class item_type_id(Resource):
         return jsonify(json_send)
 
     def patch(self, _id):
+        query = ItemType.query.get(_id)
+        if not query:
+            abort(404, message="ItemType id {} doesn't exists".format(_id))
+
         parser = reqparse.RequestParser()
         parser.add_argument("name", type=str)
         parser.add_argument("description", type=str)
         parser.add_argument("brand_id", type=int, help="Must match an existing brand")
         document = parser.parse_args()
-
-        query = ItemType.query.get(_id)
 
         name = document.get("name")
         description = document.get("description")
@@ -177,8 +179,68 @@ class new_item_type(Resource):
         return jsonify(json_send)
 
 
+class brand_id(Resource):
+    def get(self, _id):
+        query = Brand.query.get(_id)
+        if not query:
+            abort(404, message="Brand id {} doesn't exists".format(_id))
+        json_send = {}
+        json_send[query.id] = {"name": query.name}
+        return jsonify(json_send)
+
+    def delete(self, _id):
+        query = Brand.query.get(_id)
+        if not query:
+            abort(404, message="Brand id {} doesn't exists".format(_id))
+        db.session.delete(query)
+        db.session.commit()
+        json_send = {}
+        json_send[query.id] = {"name": query.name}
+        return jsonify(json_send)
+
+    def patch(self, _id):
+        query = Brand.query.get(_id)
+        if not query:
+            abort(404, message="Brand id {} doesn't exists".format(_id))
+
+        parser = reqparse.RequestParser()
+        parser.add_argument("name", type=str)
+        document = parser.parse_args()
+
+        name = document.get("name")
+
+        if name:
+            query.name = name
+        try:
+            db.session.commit()
+        except IntegrityError as ex:  # for constraint violation
+            abort(400, message=str(ex))
+
+
+class new_brand(Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument("name", type=str)
+
+    def post(self):
+        document = self.parser.parse_args(strict=True)
+        name = document.get("name")
+
+        brand = Brand(name=name)
+        db.session.add(brand)
+        try:
+            db.session.commit()
+        except IntegrityError as ex:
+            abort(400, message=str(ex))
+
+        json_send = {}
+        json_send[brand.id] = {"name": name}
+        return jsonify(json_send)
+
+
 api.add_resource(get_all_item_type_brand, "/all_item_type_brand")
 api.add_resource(item_type_id, "/id_item_type/<_id>")
-api.add_resource(new_item_type, "/create_item_type")
+api.add_resource(new_item_type, "/new_item_type")
+api.add_resource(brand_id, "/id_brand/<_id>")
+api.add_resource(new_brand, "/new_brand")
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0')
