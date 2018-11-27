@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from flask import Flask, request, jsonify  # noqa
+from flask import Flask, jsonify
 from flask_restful import Resource, Api, reqparse, abort
 
 from flask_sqlalchemy import SQLAlchemy
@@ -71,7 +71,7 @@ class get_all_item_type_brand(Resource):
     """SELECT i.name, i.description, i.brand_id, b.name
     FROM item_type i JOIN brand b ON i.brand_id = b.id;
 
-    create a json with this query then send
+    create a json with this query then returns
     """
     def get(self):
         query = (db.session.query(ItemType.name,
@@ -92,6 +92,11 @@ class get_all_item_type_brand(Resource):
 
 
 class item_type_id(Resource):
+    """For requests with an id
+    methods: get, delete and patch
+
+    the patch doesn't return anything, just updates the db
+    """
     def get(self, _id):
         query = ItemType.query.get(_id)
         if not query:
@@ -137,11 +142,14 @@ class item_type_id(Resource):
             query.brand_id = brand_id
         try:
             db.session.commit()
-        except IntegrityError as ex:
+        except IntegrityError as ex:  # for constraint violation
             abort(400, message=str(ex))
 
 
 class new_item_type(Resource):
+    """Create a new entry with post method
+    the name, description and brand_id must be in the json
+    """
     parser = reqparse.RequestParser()
     parser.add_argument("name", type=str)
     parser.add_argument("description", type=str)
