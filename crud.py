@@ -39,7 +39,7 @@ class ItemType(db.Model):
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False, unique=True)
-    adress = db.Column(db.String(255), nullable=False)
+    address = db.Column(db.String(255), nullable=False)
     city = db.Column(db.String(255), nullable=False, unique=True)
     __table_args__ = (db.UniqueConstraint('name', 'city', name='_name_city_uc'),)
 
@@ -237,10 +237,82 @@ class new_brand(Resource):
         return jsonify(json_send)
 
 
+class location_id(Resource):
+    def get(self, _id):
+        query = Location.query.get(_id)
+        if not query:
+            abort(404, message="Location id {} doesn't exists".format(_id))
+        json_send = {}
+        json_send[query.id] = {"name": query.name, "address": query.address, "city": query.city}
+        return jsonify(json_send)
+
+    def delete(self, _id):
+        query = Location.query.get(_id)
+        if not query:
+            abort(404, message="Location id {} doesn't exists".format(_id))
+        db.session.delete(query)
+        db.session.commit()
+        json_send = {}
+        json_send[query.id] = {"name": query.name, "address": query.address, "city": query.city}
+        return jsonify(json_send)
+
+    def patch(self, _id):
+        query = Location.query.get(_id)
+        if not query:
+            abort(404, message="Location id {} doesn't exists".format(_id))
+
+        parser = reqparse.RequestParser()
+        parser.add_argument("name", type=str)
+        parser.add_argument("address", type=str)
+        parser.add_argument("city", type=str)
+        document = parser.parse_args()
+
+        name = document.get("name")
+        address = document.get("address")
+        city = document.get("city")
+
+        if name:
+            query.name = name
+        if address:
+            query.address = address
+        if city:
+            query.city = city
+        try:
+            db.session.commit()
+        except IntegrityError as ex:  # for constraint violation
+            abort(400, message=str(ex))
+
+
+class new_location(Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument("name", type=str)
+    parser.add_argument("address", type=str)
+    parser.add_argument("city", type=str)
+
+    def post(self):
+        document = self.parser.parse_args(strict=True)
+        name = document.get("name")
+        address = document.get("address")
+        city = document.get("city")
+
+        location = Location(name=name, address=address, city=city)
+        db.session.add(location)
+        try:
+            db.session.commit()
+        except IntegrityError as ex:
+            abort(400, message=str(ex))
+
+        json_send = {}
+        json_send[location.id] = {"name": name, "address": address, "city": city}
+        return jsonify(json_send)
+
+
 api.add_resource(get_all_item_type_brand, "/all_item_type_brand")
 api.add_resource(item_type_id, "/id_item_type/<_id>")
 api.add_resource(new_item_type, "/new_item_type")
 api.add_resource(brand_id, "/id_brand/<_id>")
 api.add_resource(new_brand, "/new_brand")
+api.add_resource(location_id, "/id_location/<_id>")
+api.add_resource(new_location, "/new_location")
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0')
