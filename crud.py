@@ -47,6 +47,7 @@ class Location(db.Model):
 class Item(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expiration_date = db.Column(db.DateTime, nullable=False)
 
     item_type_id = db.Column(db.Integer, db.ForeignKey("item_type.id"), nullable=False)
     item_type = db.relationship("ItemType", backref=db.backref("items", lazy=True))
@@ -97,10 +98,12 @@ class item_type_id(Resource):
 
     the patch doesn't return anything, just updates the db
     """
+    error_message = "ItemType id {} doesn't exists"
+
     def get(self, _id):
         query = ItemType.query.get(_id)
         if not query:
-            abort(404, message="ItemType id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
         json_send = {}
         json_send[query.id] = {"name": query.name,
                                "description": query.description,
@@ -110,7 +113,7 @@ class item_type_id(Resource):
     def delete(self, _id):
         query = ItemType.query.get(_id)
         if not query:
-            abort(404, message="ItemType id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
         db.session.delete(query)
         db.session.commit()
         json_send = {}
@@ -122,7 +125,7 @@ class item_type_id(Resource):
     def patch(self, _id):
         query = ItemType.query.get(_id)
         if not query:
-            abort(404, message="ItemType id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
 
         parser = reqparse.RequestParser()
         parser.add_argument("name", type=str)
@@ -180,10 +183,12 @@ class new_item_type(Resource):
 
 
 class brand_id(Resource):
+    error_message = "Brand id {} doesn't exists"
+
     def get(self, _id):
         query = Brand.query.get(_id)
         if not query:
-            abort(404, message="Brand id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
         json_send = {}
         json_send[query.id] = {"name": query.name}
         return jsonify(json_send)
@@ -191,7 +196,7 @@ class brand_id(Resource):
     def delete(self, _id):
         query = Brand.query.get(_id)
         if not query:
-            abort(404, message="Brand id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
         db.session.delete(query)
         db.session.commit()
         json_send = {}
@@ -201,7 +206,7 @@ class brand_id(Resource):
     def patch(self, _id):
         query = Brand.query.get(_id)
         if not query:
-            abort(404, message="Brand id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
 
         parser = reqparse.RequestParser()
         parser.add_argument("name", type=str)
@@ -238,10 +243,12 @@ class new_brand(Resource):
 
 
 class location_id(Resource):
+    error_message = "Location id {} doesn't exists"
+
     def get(self, _id):
         query = Location.query.get(_id)
         if not query:
-            abort(404, message="Location id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
         json_send = {}
         json_send[query.id] = {"name": query.name, "address": query.address, "city": query.city}
         return jsonify(json_send)
@@ -249,7 +256,7 @@ class location_id(Resource):
     def delete(self, _id):
         query = Location.query.get(_id)
         if not query:
-            abort(404, message="Location id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
         db.session.delete(query)
         db.session.commit()
         json_send = {}
@@ -259,7 +266,7 @@ class location_id(Resource):
     def patch(self, _id):
         query = Location.query.get(_id)
         if not query:
-            abort(404, message="Location id {} doesn't exists".format(_id))
+            abort(404, message=self.error_message.format(_id))
 
         parser = reqparse.RequestParser()
         parser.add_argument("name", type=str)
@@ -307,6 +314,94 @@ class new_location(Resource):
         return jsonify(json_send)
 
 
+class item_id(Resource):
+    error_message = "Item id {} doesn't exists"
+
+    def get(self, _id):
+        query = Item.query.get(_id)
+        if not query:
+            abort(404, message=self.error_message.format(_id))
+        json_send = {}
+        json_send[query.id] = {"created_at": query.created_at,
+                               "expiration_date": query.expiration_date,
+                               "item_type_id": query.item_type_id,
+                               "location_id": query.location_id}
+        return jsonify(json_send)
+
+    def delete(self, _id):
+        query = Item.query.get(_id)
+        if not query:
+            abort(404, message=self.error_message.format(_id))
+        db.session.delete(query)
+        db.session.commit()
+        json_send = {}
+        json_send[query.id] = {"created_at": query.created_at,
+                               "expiration_date": query.expiration_date,
+                               "item_type_id": query.item_type_id,
+                               "location_id": query.location_id}
+        return jsonify(json_send)
+
+    def patch(self, _id):
+        query = Item.query.get(_id)
+        if not query:
+            abort(404, message=self.error_message.format(_id))
+
+        parser = reqparse.RequestParser()
+        parser.add_argument("expiration_date", type=datetime.date)
+        parser.add_argument("item_type_id", type=int)
+        parser.add_argument("location_id", type=int)
+        document = parser.parse_args()
+
+        expiration_date = document.get("expiration_date")
+        item_type_id = document.get("item_type_id")
+        location_id = document.get("location_id")
+
+        if expiration_date:
+            query.expiration_date = expiration_date
+        if item_type_id:
+            query.item_type_id = item_type_id
+        if location_id:
+            query.location_id = location_id
+        try:
+            db.session.commit()
+        except IntegrityError as ex:  # for constraint violation
+            abort(400, message=str(ex))
+
+
+class new_item(Resource):
+    parser = reqparse.RequestParser()
+    parser.add_argument("expiration_date", type=datetime.date)
+    parser.add_argument("item_type_id", type=int, help="Must match an existing item_type")
+    parser.add_argument("location_id", type=int, help="Must match an existing location")
+
+    def post(self):
+        document = self.parser.parse_args(strict=True)
+        expiration_date = document.get("expiration_date")
+        item_type_id = document.get("item_type_id")
+        location_id = document.get("location_id")
+
+        query_item_type = ItemType.query.get(item_type_id)
+        if not query_item_type:
+            abort(404, message="item_type_id {} doesn't exists".format(item_type_id))
+        query_location = Location.query.get(location_id)
+        if not query_location:
+            abort(404, message="location_id {} doesn't exists".format(location_id))
+
+        item = Item(expiration_date=expiration_date, item_type_id=item_type_id, location_id=location_id)
+        db.session.add(item)
+        try:
+            db.session.commit()
+        except IntegrityError as ex:
+            abort(400, message=str(ex))
+
+        json_send = {}
+        json_send[item.id] = {"created_at": item.created_at,
+                              "expiration_date": item.expiration_date,
+                              "item_type_id": item.item_type_id,
+                              "location_id": item.location_id}
+        return jsonify(json_send)
+
+
 api.add_resource(get_all_item_type_brand, "/all_item_type_brand")
 api.add_resource(item_type_id, "/id_item_type/<_id>")
 api.add_resource(new_item_type, "/new_item_type")
@@ -314,5 +409,7 @@ api.add_resource(brand_id, "/id_brand/<_id>")
 api.add_resource(new_brand, "/new_brand")
 api.add_resource(location_id, "/id_location/<_id>")
 api.add_resource(new_location, "/new_location")
+api.add_resource(item_id, "/id_item/<_id>")
+api.add_resource(new_item, "/new_item")
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0')
